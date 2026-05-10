@@ -5,18 +5,20 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 const app = express();
+const { searchPopular } = require('./services/musicService');
+const { searchWithCategory } = require('./services/searchMusic');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
-let downloadStatus = {
-  current: '',
-  progress: 0,
-  completed: 0,
-  total: 0,
-  queue: [],
-  details: { size: '', duration: '' },
-};
-const downloadFolder = path.join(os.homedir(), 'Music');
+let downloadStatus = { current: '', progress: 0, completed: 0, total: 0, queue: [], details: { size: '', duration: '' } };
+const baseMusicFolder = path.join(os.homedir(), 'Music');
+app.get('/search-popular', searchPopular);
+
+app.get('/search-category', searchWithCategory);
+app.get('/search', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'search.html'));
+});
+
 app.post('/get-info', (req, res) => {
   const url = req.body.url;
   if (!url) return res.json({ error: 'URL kosong' });
@@ -28,18 +30,10 @@ app.post('/get-info', (req, res) => {
       let videos = [];
       if (data.entries) {
         data.entries.forEach((entry) => {
-          videos.push({
-            title: entry.title,
-            url: `https://youtu.be/${entry.id}`,
-            thumbnail: entry.thumbnail || (entry.thumbnails ? entry.thumbnails[0].url : '') || data.thumbnail,
-          });
+          videos.push({ title: entry.title, url: `https://youtu.be/${entry.id}`, thumbnail: entry.thumbnail || (entry.thumbnails ? entry.thumbnails[0].url : '') || data.thumbnail });
         });
       } else {
-        videos.push({
-          title: data.title,
-          url: url,
-          thumbnail: data.thumbnail,
-        });
+        videos.push({ title: data.title, url: url, thumbnail: data.thumbnail });
       }
       res.json({ videos });
     } catch (e) {
@@ -48,23 +42,29 @@ app.post('/get-info', (req, res) => {
   });
 });
 app.post('/download-selected', (req, res) => {
-  let { videos, format, resolution } = req.body;
+  let { videos, format, resolution, selectedFolder, subFolder } = req.body;
   if (!videos) {
     return res.json({ error: 'Tidak ada video' });
   }
   if (!Array.isArray(videos)) {
     videos = [videos];
   }
+  selectedFolder = selectedFolder?.replace(/(\.\.[\/\\])/g, '');
+  subFolder = subFolder?.replace(/(\.\.[\/\\])/g, '');
+  const downloadFolder = path.join(baseMusicFolder, selectedFolder || '', subFolder || '');
+  if (!fs.existsSync(downloadFolder)) {
+    fs.mkdirSync(downloadFolder, { recursive: true });
+  }
   downloadStatus.total = videos.length;
   downloadStatus.completed = 0;
   downloadStatus.queue = videos.map((v) => v.title);
-  runQueue(videos, format, resolution);
+  runQueue(videos, format, resolution, downloadFolder);
   res.json({ started: true });
 });
 app.get('/status', (req, res) => {
   res.json(downloadStatus);
 });
-function runQueue(videos, format, resolution) {
+function runQueue(videos, format, resolution, downloadFolder) {
   const downloadNext = (index) => {
     if (index >= videos.length) {
       downloadStatus.current = 'Semua selesai ✅';
@@ -84,11 +84,7 @@ function runQueue(videos, format, resolution) {
         sizeMB = (parseInt(rawSize) / (1024 * 1024)).toFixed(2) + ' MB';
       }
       downloadStatus.current = video.title;
-      downloadStatus.details = {
-        size: sizeMB,
-        duration: duration,
-        thumbnail: video.thumbnail,
-      };
+      downloadStatus.details = { size: sizeMB, duration: duration, thumbnail: video.thumbnail };
       downloadStatus.progress = 0;
       let args;
       if (format === 'mp3') {
@@ -103,10 +99,16 @@ function runQueue(videos, format, resolution) {
         const match = line.match(/(\d+(\.\d+)?)%/);
         if (match) downloadStatus.progress = parseFloat(match[1]);
       });
-      ytdlp.on('close', () => {
+      ytdlp.on('close', (code) => {
+        if (code !== 0) {
+          console.log('Download gagal:', video.title);
+        }
         downloadStatus.completed++;
         downloadStatus.queue.shift();
         downloadNext(index + 1);
+      });
+      ytdlp.on('error', (err) => {
+        console.error('yt-dlp error:', err);
       });
     });
   };

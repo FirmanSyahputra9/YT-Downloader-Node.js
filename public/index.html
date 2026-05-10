@@ -64,19 +64,59 @@
             max-height: 300px;
             overflow-y: auto;
         }
+
+        button {
+            position: relative;
+            z-index: 9999;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #ccc;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <div class="card">
-            <h2>🎵 PutraVerse YT Downloader</h2> <input type="text" id="url" style="width:100%;padding:8px;"
-                placeholder="Tempel URL"> <br><br> <button class="primary" id="searchBtn"
-                onclick="getInfo()">Cari</button>
+            <label>Minimal Views</label>
+            <input type="range" id="minViews" min="10000" max="50000000" step="10000" value="500000">
+            <span id="viewValue">500000</span> <br><br>
+
+            <label>Durasi Video:</label>
+            <select id="durationFilter" onchange="searchPopular()" style="padding: 5px; border-radius: 5px;">
+                <option value="norm">Normal (3-5 menit)</option>
+
+            </select>
+            <br><br>
+
+            <button class="primary" onclick="searchPopular()">🔥 Cari Music Populer</button>
+            <button class="primary" onclick="window.location.href='/search'">Cari Judul</button>
         </div>
+
         <div class="card" id="videoSection" style="display:none;">
             <h3>Pilih Video</h3> <button class="primary" onclick="selectAll()">Select All</button> <button
                 class="primary" onclick="discardAll()">Discard All</button> <br><br>
+            <div id="loader" style="display:none; text-align:center; padding:20px;">
+                <div class="spinner"></div>
+                <p>🔍 Mencari music populer...</p>
+            </div>
             <div id="videoList"></div> <br> <select id="format">
                 <option value="mp4">MP4</option>
                 <option value="mp3">MP3</option>
@@ -85,18 +125,22 @@
                 <option value="360">360p</option>
                 <option value="720">720p</option>
                 <option value="1080">1080p</option>
-            </select> <br><br> <button class="success" onclick="startDownload()">Download</button>
+
+
+            </select> <br><br> <label>Folder Utama (dalam Music)</label> <input type="text" id="selectedFolder"
+                placeholder="Contoh: DJ" style="width:100%;padding:6px;margin-bottom:8px;"> <label>Sub Folder
+                (opsional)</label> <input type="text" id="subFolder" placeholder="Contoh: Remix"
+                style="width:100%;padding:6px;"> <br><br> <button class="success"
+                onclick="startDownload()">Download</button>
         </div>
         <div class="card" id="progressSection" style="display:none;">
             <h3>🚀 Download Progress</h3>
-            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
-                <img id="currentThumb" src=""
-                    style="width: 120px; border-radius: 8px; display: none; border: 1px solid #ddd;">
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;"> <img id="currentThumb"
+                    src="" style="width: 120px; border-radius: 8px; display: none; border: 1px solid #ddd;">
                 <div>
                     <p id="current" style="font-weight: bold; margin: 0;"></p>
-                    <div id="fileInfo" style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                        <span id="videoDuration"></span> | <span id="videoSize"></span>
-                    </div>
+                    <div id="fileInfo" style="font-size: 0.85em; color: #666; margin-top: 5px;"> <span
+                            id="videoDuration"></span> | <span id="videoSize"></span> </div>
                 </div>
             </div>
             <div class="progress-bar">
@@ -111,12 +155,40 @@
         <hr>
     </div>
     </div>
-    <script>        let progressInterval = null; function selectAll() { document.querySelectorAll('.videoCheck').forEach(cb => { cb.checked = true; }); } function discardAll() { document.querySelectorAll('.videoCheck').forEach(cb => { cb.checked = false; }); } function startProgressPolling() {
-            if (progressInterval) return; progressInterval = setInterval(async () => {
+    <script>
+        const slider = document.getElementById('minViews');
+        const viewText = document.getElementById('viewValue');
+        function formatViews(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num;
+        }
+        slider.oninput = () => {
+            viewText.innerText = formatViews(slider.value);
+        };
+        slider.onchange = () => {
+            searchPopular();
+        };
+        let progressInterval = null;
+        function selectAll() {
+            document.querySelectorAll('.videoCheck').forEach((cb) => {
+                cb.checked = true;
+            });
+        }
+        function discardAll() {
+            document.querySelectorAll('.videoCheck').forEach((cb) => {
+                cb.checked = false;
+            });
+        }
+        function startProgressPolling() {
+            if (progressInterval) return;
+            progressInterval = setInterval(async () => {
                 const res = await fetch('/status');
-                const data = await res.json(); document.getElementById('current').innerText = "Sedang: " + data.current; if (data.details) {
-                    document.getElementById('videoDuration').innerText = "🕒 Durasi: " + (data.details.duration || '-');
-                    document.getElementById('videoSize').innerText = "📦 Ukuran Est: " + (data.details.size || '-');
+                const data = await res.json();
+                document.getElementById('current').innerText = 'Sedang: ' + data.current;
+                if (data.details) {
+                    document.getElementById('videoDuration').innerText = '🕒 Durasi: ' + (data.details.duration || '-');
+                    document.getElementById('videoSize').innerText = '📦 Ukuran Est: ' + (data.details.size || '-');
                     const thumbImg = document.getElementById('currentThumb');
                     if (data.details.thumbnail) {
                         thumbImg.src = data.details.thumbnail;
@@ -124,55 +196,133 @@
                     } else {
                         thumbImg.style.display = 'none';
                     }
-                } document.getElementById('bar').style.width =
-                    data.progress + "%"; document.getElementById('percent').innerText =
-                        data.progress + "%"; document.getElementById('queue').innerText =
-                            "Antrian: " + (data.total - data.completed); document.getElementById('done').innerText =
-                                "Selesai: " + data.completed + " / " + data.total;
-                // 🔹 Render Queue List
+                }
+                document.getElementById('bar').style.width = data.progress + '%';
+                document.getElementById('percent').innerText = data.progress + '%';
+                document.getElementById('queue').innerText = 'Antrian: ' + (data.total - data.completed);
+                document.getElementById('done').innerText = 'Selesai: ' + data.completed + ' / ' + data.total;
                 const queueList = document.getElementById('queueList');
-                queueList.innerHTML = ''; data.queue.forEach((video, index) => {
-                    queueList.innerHTML += `
-                <div class="video-item">
-                    ${index + 1}. ${video}
-                </div>
-            `;
+                queueList.innerHTML = '';
+                data.queue.forEach((video, index) => {
+                    queueList.innerHTML += `                  <div class="video-item">                      ${index + 1}. ${video}                  </div>              `;
                 });
                 if (data.completed === data.total && data.total !== 0) {
                     clearInterval(progressInterval);
                     progressInterval = null;
                 }
             }, 1000);
-        } async function getInfo() {
-            const url = document.getElementById('url').value; const btn = document.getElementById('searchBtn'); if (!url) { alert("Masukkan URL dulu"); return; } btn.innerText = "Loading..."; btn.disabled = true; try {
-                const res = await fetch('/get-info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); const data = await res.json(); if (data.error) { alert(data.error); return; } const list = document.getElementById('videoList'); list.innerHTML = ''; data.videos.forEach(v => {
-                    list.innerHTML += `
-        <div class="video-item" style="display:flex; align-items:center; gap:10px;">
-            <input type="checkbox" value="${v.url}" data-title="${v.title}" data-thumb="${v.thumbnail}" class="videoCheck">
-            <img src="${v.thumbnail}" style="width:80px; border-radius:4px;">
-            <span>${v.title}</span>
-        </div>
-    `;
-                }); document.getElementById('videoSection').style.display = 'block'; window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-            } finally { btn.innerText = "Cari"; btn.disabled = false; }
-        } async function startDownload() {
-            document.getElementById('bar').style.width = "0%";
-            document.getElementById('percent').innerText = "0%"; const checks = document.querySelectorAll('.videoCheck:checked');
-            const videos = Array.from(checks).map(c => ({
-                url: c.value,
-                title: c.dataset.title,
-                thumbnail: c.dataset.thumb
-            })); const format = document.getElementById('format').value;
-            const resolution = document.getElementById('resolution').value; if (videos.length === 0) {
+        }
+        async function getInfo() {
+            const url = document.getElementById('url').value;
+            const btn = document.getElementById('searchBtn');
+            if (!url) {
+                alert('Masukkan URL dulu');
+                return;
+            }
+            btn.innerText = 'Loading...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/get-info', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+                const data = await res.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                const list = document.getElementById('videoList');
+                list.innerHTML = '';
+                data.videos.forEach((v) => {
+                    list.innerHTML += `          <div class="video-item" style="display:flex; align-items:center; gap:10px;">              <input type="checkbox" value="${v.url}" data-title="${v.title}" data-thumb="${v.thumbnail}" class="videoCheck">              <img src="${v.thumbnail}" style="width:80px; border-radius:4px;">              <span>${v.title}</span>          </div>      `;
+                });
+                document.getElementById('videoSection').style.display = 'block';
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            } finally {
+                btn.innerText = 'Cari';
+                btn.disabled = false;
+            }
+        }
+        async function startDownload() {
+            document.getElementById('bar').style.width = '0%';
+            document.getElementById('percent').innerText = '0%';
+            const checks = document.querySelectorAll('.videoCheck:checked');
+            const videos = Array.from(checks).map((c) => ({ url: c.value, title: c.dataset.title, thumbnail: c.dataset.thumb }));
+            const format = document.getElementById('format').value;
+            const resolution = document.getElementById('resolution').value;
+            if (videos.length === 0) {
                 alert('Pilih minimal 1 video');
                 return;
-            } await fetch('/download-selected', {
+            }
+            await fetch('/download-selected', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ videos, format, resolution })
-            }); document.getElementById('progressSection').style.display = 'block'; startProgressPolling(); document.getElementById('progressSection')
-                .scrollIntoView({ behavior: 'smooth' });
-        }    </script>
+                body: JSON.stringify({ videos, format, resolution, selectedFolder: document.getElementById('selectedFolder').value, subFolder: document.getElementById('subFolder').value }),
+            });
+            document.getElementById('progressSection').style.display = 'block';
+            startProgressPolling();
+            document.getElementById('progressSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+
+        async function searchPopular() {
+            const minViews = document.getElementById('minViews').value;
+            const duration = document.getElementById('durationFilter').value;
+            const list = document.getElementById('videoList');
+            const loader = document.getElementById('loader');
+            const statusText = loader.querySelector('p');
+
+            document.getElementById('videoSection').style.display = 'block';
+            loader.style.display = 'block';
+            list.innerHTML = '';
+            statusText.innerText = '🔄 Menghubungkan ke server...';
+
+            let shownUrls = new Set();
+
+            if (window.popularSource) {
+                window.popularSource.close();
+            }
+
+            window.popularSource = new EventSource(`/search-popular?minViews=${minViews}&duration=${duration}`);
+
+            window.popularSource.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'append') {
+                    const v = data.video;
+                    if (shownUrls.has(v.url)) return;
+                    shownUrls.add(v.url);
+
+                    const item = document.createElement('div');
+                    item.className = 'video-item';
+                    item.style = 'display:flex; align-items:center; gap:10px; padding:10px; border-bottom:1px solid #eee; opacity:0; transition:0.3s;';
+
+                    item.innerHTML = `
+                <input type="checkbox" value="${v.url}" data-title="${v.title}" data-thumb="${v.thumbnail}" class="videoCheck">
+                <img src="${v.thumbnail}" style="width:80px; border-radius:4px;">
+                <div>
+                    <div style="font-weight:bold; color:black; font-size:14px;">${v.title}</div>
+                    <div style="color:#27ae60; font-size:12px;">🔥 ${formatViews(v.views)} views</div>
+                </div>
+            `;
+                    list.appendChild(item);
+
+                    setTimeout(() => { item.style.opacity = 1; }, 10);
+                    list.scrollTop = list.scrollHeight;
+                    statusText.innerText = `🔍 Ditemukan: ${shownUrls.size} video cocok`;
+                }
+
+                if (data.type === 'done') {
+                    loader.style.display = 'none';
+                    statusText.innerText = '✅ Selesai!';
+                    window.popularSource.close();
+                }
+            };
+
+            window.popularSource.onerror = function () {
+                loader.style.display = 'none';
+                window.popularSource.close();
+            };
+        } searchPopular();
+
+    </script>
 </body>
 
 </html>

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>PutraVerse - Music Discovery</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: linear-gradient(135deg, #1f1f1f, #2c3e50);
+            margin: 0;
+            padding: 40px;
+            color: white;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            color: black;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .video-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            transition: 0.2s;
+        }
+
+        .video-item:hover {
+            background: #f9f9f9;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .progress-bar {
+            width: 100%;
+            background: #444;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress {
+            height: 20px;
+            background: #27ae60;
+            width: 0%;
+            transition: 0.3s;
+        }
+
+        #videoList {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .spinner {
+            width: 30px;
+            height: 30px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 10px auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" style="color: #3498db; text-decoration: none;">← Kembali ke Downloader</a>
+        <h2>🔍 Music Discovery Service</h2>
+
+        <div class="card">
+            <label>Cari Lagu Apapun:</label><br>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <input type="text" id="searchInput" placeholder="Ketik judul lagu atau artis..."
+                    style="flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
+                <button class="primary" onclick="startSearch()">Cari</button>
+            </div>
+        </div>
+
+        <div class="card" id="resultsSection" style="display:none;">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                <div>
+                    <h3 style="margin:0;">Hasil Pencarian</h3>
+                    <span id="statsInfo" style="font-size: 13px; color: #666;">
+                        Tersedia: <b id="totalDisplayed">0</b> |
+                        Terpilih: <b id="totalSelected">0</b> |
+                        Sesuai Filter: <b id="totalFiltered">0</b>
+                    </span>
+                </div>
+                <div>
+                    <button onclick="selectAll()" style="padding: 5px 10px; font-size: 12px;">Select All</button>
+                    <button onclick="discardAll()" style="padding: 5px 10px; font-size: 12px;">Discard</button>
+                </div>
+            </div>
+
+            <div
+                style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; gap: 15px; align-items: center; color: black; font-size: 14px; border: 1px solid #ddd;">
+                <strong>Filter Durasi (Menit):</strong>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="minDuration" placeholder="0" step="0.1" min="0"
+                        style="width: 70px; padding: 8px; border-radius: 4px; border: 1px solid #ccc;"
+                        oninput="applyFilter()">
+                    <span>Min</span>
+                </div>
+                <span>s/d</span>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="maxDuration" placeholder="∞" step="0.1" min="0"
+                        style="width: 70px; padding: 8px; border-radius: 4px; border: 1px solid #ccc;"
+                        oninput="applyFilter()">
+                    <span>Max</span>
+                </div>
+                <small style="color: #666; margin-left: 10px;">*Bisa desimal (misal: 3.5)</small>
+            </div>
+
+
+            <div id="videoList"></div>
+
+            <div id="loader" style="display:none; text-align:center;">
+                <div class="spinner"></div>
+                <p>Mencari music...</p>
+            </div>
+            <div style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    <div>
+                        <label>Format:</label>
+                        <select id="format" style="width:100%; padding:8px;">
+                            <option value="mp3">MP3 (Musik)</option>
+                            <option value="mp4">MP4 (Video)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Resolusi (Jika MP4):</label>
+                        <select id="resolution" style="width:100%; padding:8px;">
+                            <option value="best">Terbaik</option>
+                            <option value="1080">1080p</option>
+                            <option value="720">720p</option>
+                            <option value="480">480p</option>
+                            <option value="360">360p</option>
+                        </select>
+                    </div>
+                </div>
+
+                <label>Simpan ke Folder (di dalam Music):</label>
+                <input type="text" id="selectedFolder" placeholder="Nama Folder (Contoh: MySearch)"
+                    style="width:97%; padding:8px; margin-top:5px;">
+
+                <button class="success" onclick="startDownload()"
+                    style="width: 100%; margin-top: 15px; font-size: 18px;">MULAI DOWNLOAD</button>
+            </div>
+        </div>
+
+        <div class="card" id="progressSection" style="display:none;">
+            <h3>🚀 Download Progress</h3>
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
+                <img id="currentThumb" src=""
+                    style="width: 120px; border-radius: 8px; display: none; border: 1px solid #ddd;">
+                <div>
+                    <p id="current" style="font-weight: bold; margin: 0;"></p>
+                    <div id="fileInfo" style="font-size: 0.85em; color: #666; margin-top: 5px;">
+                        <span id="videoDuration"></span> | <span id="videoSize"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="progress-bar">
+                <div class="progress" id="bar"></div>
+            </div>
+            <p id="percent" style="text-align: right; margin-top: 5px;">0%</p>
+            <p id="queue" style="font-size: 14px; margin: 5px 0;"></p>
+            <p id="done" style="font-size: 14px; font-weight: bold; color: #27ae60;"></p>
+
+            <h4>📋 List Antrian</h4>
+            <div id="queueList"
+                style="max-height:200px; overflow-y:auto; border: 1px solid #eee; padding: 5px; border-radius: 5px;">
+            </div>
+        </div>
+    </div>
+
+    <script>
+
+        let currentPage = 1;
+        let isSearching = false;
+        let currentQuery = "";
+
+
+        function parseDuration(str) {
+            if (!str || str === 'N/A') return 0;
+            const parts = str.split(':').reverse();
+            let seconds = 0;
+            // parts[0] = detik, parts[1] = menit, parts[2] = jam
+            if (parts[0]) seconds += parseInt(parts[0]);
+            if (parts[1]) seconds += parseInt(parts[1]) * 60;
+            if (parts[2]) seconds += parseInt(parts[2]) * 3600;
+            return seconds;
+        }
+
+        function formatViews(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num;
+        }
+
+        function updateStats() {
+            const allItems = document.querySelectorAll('.video-item');
+            const totalDisplayed = allItems.length;
+
+            // Hitung yang tidak disembunyikan oleh filter
+            let totalFiltered = 0;
+            allItems.forEach(item => {
+                if (item.style.display !== 'none') totalFiltered++;
+            });
+
+            const totalSelected = document.querySelectorAll('.videoCheck:checked').length;
+
+            document.getElementById('totalDisplayed').innerText = totalDisplayed;
+            document.getElementById('totalFiltered').innerText = totalFiltered;
+            document.getElementById('totalSelected').innerText = totalSelected;
+        }
+
+
+        function applyFilter() {
+            // Ambil input menit dan ubah ke detik
+            const minMin = parseFloat(document.getElementById('minDuration').value) || 0;
+            const maxMin = parseFloat(document.getElementById('maxDuration').value) || Infinity;
+
+            const minSec = minMin * 60;
+            const maxSec = maxMin * 60;
+
+            const items = document.querySelectorAll('.video-item');
+
+            items.forEach(item => {
+                const durationSeconds = parseInt(item.dataset.durationSeconds);
+
+                if (durationSeconds >= minSec && durationSeconds <= maxSec) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                    // Otomatis uncheck lagu yang tersembunyi agar tidak ikut terdownload
+                    const checkbox = item.querySelector('.videoCheck');
+                    if (checkbox.checked) {
+                        checkbox.checked = false;
+                    }
+                }
+            });
+
+            updateStats();
+        }
+
+        function selectAll() {
+            document.querySelectorAll('.video-item').forEach(item => {
+                if (item.style.display !== 'none') {
+                    item.querySelector('.videoCheck').checked = true;
+                }
+            });
+            updateStats();
+        }
+
+        function discardAll() {
+            document.querySelectorAll('.videoCheck').forEach(cb => cb.checked = false);
+            updateStats();
+        }
+
+
+        async function startSearch() {
+            currentQuery = document.getElementById('searchInput').value;
+            if (!currentQuery) return alert("Ketik sesuatu!");
+
+            currentPage = 1;
+            document.getElementById('videoList').innerHTML = '';
+            document.getElementById('totalDisplayed').innerText = '0';
+            document.getElementById('totalSelected').innerText = '0';  
+            loadResults(currentQuery, currentPage);
+        }
+
+
+
+
+        function loadResults(query, page) {
+            if (isSearching) return;
+            isSearching = true;
+
+            const list = document.getElementById('videoList');
+            const loader = document.getElementById('loader');
+
+            document.getElementById('resultsSection').style.display = 'block';
+
+            loader.style.display = 'block';
+            loader.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            const source = new EventSource(`/search-category?q=${encodeURIComponent(query)}&page=${page}`);
+
+            source.onmessage = function (e) {
+                const data = JSON.parse(e.data);
+                if (data.type === 'append') {
+                    const v = data.video;
+                    const durationSec = parseDuration(v.duration_string);
+
+                    const div = document.createElement('div');
+                    div.className = 'video-item';
+                    div.dataset.durationSeconds = durationSec;
+
+                    div.innerHTML = `
+            <input type="checkbox" value="${v.url}" data-title="${v.title}" data-thumb="${v.thumbnail}" 
+                   class="videoCheck" onchange="updateStats()">
+            <img src="${v.thumbnail}" style="width:80px; height:45px; object-fit:cover; border-radius:5px;">
+            <div style="flex:1">
+                <div style="font-weight:bold; font-size:14px; color:black;">${v.title}</div>
+                <div style="color:#27ae60; font-size:12px;">🔥 ${formatViews(v.views)} views | 🕒 ${v.duration_string}</div>
+            </div>
+        `;
+                    list.appendChild(div);
+
+                    applyFilter();
+                }
+                if (data.type === 'done') {
+                    loader.style.display = 'none';
+                    isSearching = false;
+                    source.close();
+                }
+            };
+
+            source.onerror = function () {
+                loader.style.display = 'none';
+                isSearching = false;
+                source.close();
+            };
+        }
+
+        // Deteksi Scroll di dalam list
+        document.getElementById('videoList').addEventListener('scroll', function () {
+            const list = this;
+            // Jika sisa jarak scroll kurang dari 50px, load halaman berikutnya
+            if (list.scrollTop + list.clientHeight >= list.scrollHeight - 50) {
+                if (!isSearching) {
+                    currentPage++;
+                    loadResults(currentQuery, currentPage);
+                }
+            }
+        });
+        async function startDownload() {
+            const checks = document.querySelectorAll('.videoCheck:checked');
+            if (checks.length === 0) return alert('Pilih minimal 1 lagu!');
+
+            const videos = Array.from(checks).map(c => ({
+                url: c.value,
+                title: c.dataset.title,
+                thumbnail: c.dataset.thumb
+            }));
+
+            const payload = {
+                videos: videos,
+                format: document.getElementById('format').value,
+                resolution: document.getElementById('resolution').value,
+                selectedFolder: document.getElementById('selectedFolder').value,
+                subFolder: ''
+            };
+
+            await fetch('/download-selected', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            document.getElementById('progressSection').style.display = 'block';
+            document.getElementById('progressSection').scrollIntoView({ behavior: 'smooth' });
+            pollStatus();
+        }
+
+        function pollStatus() {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch('/status');
+                    const data = await res.json();
+
+                    document.getElementById('current').innerText = 'Sedang: ' + data.current;
+                    document.getElementById('bar').style.width = data.progress + '%';
+                    document.getElementById('percent').innerText = data.progress + '%';
+                    document.getElementById('queue').innerText = 'Antrian: ' + (data.total - data.completed);
+                    document.getElementById('done').innerText = 'Selesai: ' + data.completed + ' / ' + data.total;
+
+                    if (data.details) {
+                        document.getElementById('videoDuration').innerText = '🕒 Durasi: ' + (data.details.duration || '-');
+                        document.getElementById('videoSize').innerText = '📦 Ukuran Est: ' + (data.details.size || '-');
+                        const thumbImg = document.getElementById('currentThumb');
+                        if (data.details.thumbnail) {
+                            thumbImg.src = data.details.thumbnail;
+                            thumbImg.style.display = 'block';
+                        }
+                    }
+
+                    const queueList = document.getElementById('queueList');
+                    queueList.innerHTML = '';
+                    data.queue.forEach((video, index) => {
+                        queueList.innerHTML += `
+                    <div class="video-item" style="font-size: 13px; padding: 5px; border-bottom: 1px solid #f0f0f0;">
+                        ${index + 1}. ${video}
+                    </div>`;
+                    });
+
+                    // Stop jika selesai
+                    if (data.completed === data.total && data.total !== 0) {
+                        clearInterval(interval);
+                        document.getElementById('current').innerText = "✅ Semua Selesai!";
+                    }
+                } catch (err) {
+                    console.error("Polling error:", err);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+
+</html>
