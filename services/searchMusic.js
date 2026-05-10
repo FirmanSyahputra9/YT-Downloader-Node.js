@@ -12,7 +12,6 @@ async function searchWithCategory(req, res) {
   const startItem = (page - 1) * limit + 1;
   const endItem = page * limit;
 
-  // Variabel untuk mengecek apakah ada data yang ditemukan
   let hasResults = false;
 
   const PATH = 'C:\\Users\\FIRMAN\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\yt-dlp.exe';
